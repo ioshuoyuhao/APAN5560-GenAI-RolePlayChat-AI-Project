@@ -1,0 +1,26 @@
+# RPGChat.AI - Development Database
+# PostgreSQL + pgvector for vector similarity search
+# Usage: docker compose up -d db
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rpgchat-db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"  # Use 5433 externally (5432 often in use)
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rpgchat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rpgchat}
+      POSTGRES_DB: ${POSTGRES_DB:-rpgchat}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rpgchat -d rpgchat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+

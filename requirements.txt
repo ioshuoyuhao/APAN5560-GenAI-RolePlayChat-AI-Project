@@ -1,0 +1,25 @@
+# RolePlay Chat AI - Dependencies
+# Generated from pyproject.toml for pip compatibility
+# For development, prefer using: uv sync
+
+# Web Framework
+fastapi[standard]>=0.124.2
+pydantic>=2.12.5
+pydantic-settings>=2.0.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+pgvector>=0.3.0
+
+# Machine Learning
+torch>=2.9.1
+transformers>=4.57.3
+datasets>=4.4.1
+
+# Note: This file is for pip users. If using uv, run:
+#   uv sync
+# To install with pip:
+#   pip install -r requirements.txt
+
