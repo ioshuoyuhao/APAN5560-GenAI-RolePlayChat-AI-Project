@@ -174,7 +174,7 @@ uv run fastapi run back-end/app/main.py --port 8000
  ( New Update for project documentation)
 # RPGChat.AI
 
-RPGChat.AI is a web-based, AI-driven role-play chat application inspired by SillyTavern / OMate / Ali:Chat.  
+RPGChat.AI is a web-based, AI-driven role-play chat application inspired by SillyTavern.  
 It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, and RAG with pgvector**, built as a compact but realistic GenAI system for coursework.
 
 The project is intentionally scoped as an **MVP** suitable for a semester project, while being extensible enough for future features (long-term memory, masks, multi-character chats, etc.).
