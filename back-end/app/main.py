@@ -8,9 +8,16 @@ Run with: uv run fastapi dev back-end/app/main.py
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import engine
+from app.routers import (
+    api_providers_router,
+    prompt_templates_router,
+    knowledge_bases_router,
+)
 
 
 @asynccontextmanager
@@ -36,15 +43,26 @@ async def lifespan(app: FastAPI):
     print("🔌 Database connections closed")
 
 
-# Import text for SQL execution
-from sqlalchemy import text
-
 app = FastAPI(
     title=settings.app_name,
     description="API for roleplay chatbot with RAG and OpenAI-compatible LLM support",
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Configure CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register API routers
+app.include_router(api_providers_router, prefix="/api/settings")
+app.include_router(prompt_templates_router, prefix="/api/settings")
+app.include_router(knowledge_bases_router, prefix="/api/settings")
 
 
 @app.get("/")
@@ -72,9 +90,3 @@ def health_check_db():
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
-
-
-# TODO: Add routers as development progresses
-# from app.routers import api_providers, prompt_templates, characters, conversations
-# app.include_router(api_providers.router, prefix="/api/settings", tags=["API Providers"])
-# app.include_router(prompt_templates.router, prefix="/api/settings", tags=["Prompt Templates"])
