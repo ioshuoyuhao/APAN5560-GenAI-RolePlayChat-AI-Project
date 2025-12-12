@@ -297,7 +297,7 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
 
 - Provide a **web app demo** where users:
   - Import character cards (JSON + PNG) compatible with SillyTavern-style formats.
-  - Configure an OpenAI-compatible LLM API (DeepSeek, Doubao, custom HF, etc.).
+  - Configure an OpenAI-compatible LLM API (DeepSeek, Doubao, custom self fune-tuning HF model, etc.).
   - Chat with characters in a rich tavern-RP style.
   - Attach knowledge bases and perform **RAG** using PostgreSQL + pgvector.
 
@@ -322,7 +322,7 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
    - Grid of 1–N official demo characters.
    - Each card: avatar, name, short tagline.
    - Actions:
-     - **Download** JSON + PNG as a zip.
+     - **Download** JSON file.
      - **Import & start chat** → creates local character + new conversation.
 
 3. **Character Management**
