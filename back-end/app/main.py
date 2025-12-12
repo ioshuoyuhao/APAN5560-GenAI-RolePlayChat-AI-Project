@@ -15,8 +15,11 @@ from app.core.config import settings
 from app.core.database import engine
 from app.routers import (
     api_providers_router,
-    prompt_templates_router,
+    characters_router,
+    conversations_router,
+    discover_router,
     knowledge_bases_router,
+    prompt_templates_router,
 )
 
 
@@ -60,9 +63,15 @@ app.add_middleware(
 )
 
 # Register API routers
+# Settings endpoints
 app.include_router(api_providers_router, prefix="/api/settings")
 app.include_router(prompt_templates_router, prefix="/api/settings")
 app.include_router(knowledge_bases_router, prefix="/api/settings")
+
+# Core application endpoints
+app.include_router(characters_router, prefix="/api")
+app.include_router(conversations_router, prefix="/api")
+app.include_router(discover_router, prefix="/api")
 
 
 @app.get("/")

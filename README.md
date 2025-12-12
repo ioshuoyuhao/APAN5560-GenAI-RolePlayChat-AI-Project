@@ -46,9 +46,10 @@ cd front-end && npm install && npm run dev
 ├── back-end/
 │   ├── app/
 │   │   ├── core/            # Config & database setup
-│   │   ├── models/          # SQLAlchemy models
-│   │   ├── routers/         # API route handlers
-│   │   ├── services/        # Business logic
+│   │   ├── models/          # SQLAlchemy models (Character, Conversation, Message, etc.)
+│   │   ├── routers/         # API route handlers (discover, characters, conversations)
+│   │   ├── schemas/         # Pydantic request/response schemas
+│   │   ├── services/        # Business logic (LLMClient, PromptOrchestrator, Chunker)
 │   │   └── main.py          # FastAPI app entry point
 │   ├── alembic/             # Database migrations
 │   └── alembic.ini          # Alembic config
