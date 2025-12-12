@@ -1,8 +1,10 @@
-# RPGChat.AI - Development Database
-# PostgreSQL + pgvector for vector similarity search
-# Usage: docker compose up -d db
+# RPGChat.AI - Full Stack Docker Compose
+# Usage:
+#   Development (DB only): docker compose up -d db
+#   Production (all):      docker compose up --build
 
 services:
+  # PostgreSQL + pgvector database
   db:
     image: pgvector/pgvector:pg16
     container_name: rpgchat-db
@@ -20,7 +22,64 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - rpgchat-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./back-end
+      dockerfile: Dockerfile
+    container_name: rpgchat-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-rpgchat}:${POSTGRES_PASSWORD:-rpgchat}@db:5432/${POSTGRES_DB:-rpgchat}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      DEFAULT_API_BASE_URL: ${DEFAULT_API_BASE_URL:-}
+      DEFAULT_API_KEY: ${DEFAULT_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount character cards and images for access
+      - "./character cards:/app/character_cards:ro"
+      - "./character images:/app/character_images:ro"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    networks:
+      - rpgchat-network
+
+  # React Frontend (Nginx)
+  frontend:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api  # Use relative path since nginx proxies
+    container_name: rpgchat-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"  # Map to same port as dev server
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    networks:
+      - rpgchat-network
 
 volumes:
   pgdata:
 
+networks:
+  rpgchat-network:
+    driver: bridge

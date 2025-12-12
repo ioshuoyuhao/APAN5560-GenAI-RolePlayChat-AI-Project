@@ -21,9 +21,24 @@ from app.services.prompt_orchestrator import PromptOrchestrator
 router = APIRouter(prefix="/discover", tags=["Discover"])
 
 # Path to official character cards
-# __file__ = .../back-end/app/routers/discover.py
-# Project root = .../APAN5560-GenAI-RolePlayChat-AI-Project/
-CHARACTER_CARDS_DIR = Path(__file__).parent.parent.parent.parent / "character cards"
+# Development: relative to project root (.../APAN5560-GenAI-RolePlayChat-AI-Project/character cards)
+# Docker: mounted at /app/character_cards
+_DEV_PATH = Path(__file__).parent.parent.parent.parent / "character cards"
+_DOCKER_PATH = Path("/app/character_cards")
+
+
+def _get_character_cards_dir() -> Path:
+    """Determine the correct path for character cards (Docker vs Dev)."""
+    try:
+        # Check Docker path first (has files with .json extension)
+        if _DOCKER_PATH.exists() and list(_DOCKER_PATH.glob("*.json")):
+            return _DOCKER_PATH
+    except (PermissionError, OSError):
+        pass
+    return _DEV_PATH
+
+
+CHARACTER_CARDS_DIR = _get_character_cards_dir()
 
 
 def _load_official_characters() -> dict[str, dict]:

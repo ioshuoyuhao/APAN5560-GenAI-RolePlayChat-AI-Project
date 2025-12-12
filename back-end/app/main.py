@@ -9,10 +9,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import engine, SessionLocal
+from app.models.prompt_template import PromptTemplate
 from app.routers import (
     api_providers_router,
     characters_router,
@@ -21,13 +22,35 @@ from app.routers import (
     knowledge_bases_router,
     prompt_templates_router,
 )
+from app.routers.prompt_templates import DEFAULT_TEMPLATES
+
+
+def _seed_prompt_templates():
+    """Seed default prompt templates if they don't exist."""
+    db = SessionLocal()
+    try:
+        existing = db.execute(select(PromptTemplate)).scalars().all()
+        if not existing:
+            print("📝 Seeding default prompt templates...")
+            for template_data in DEFAULT_TEMPLATES:
+                template = PromptTemplate(**template_data)
+                db.add(template)
+            db.commit()
+            print(f"✅ Seeded {len(DEFAULT_TEMPLATES)} prompt templates")
+        else:
+            print(f"📝 Found {len(existing)} existing prompt templates")
+    except Exception as e:
+        print(f"⚠️ Failed to seed prompt templates: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application lifespan handler.
-    - Startup: Verify database connection
+    - Startup: Verify database connection, seed defaults
     - Shutdown: Dispose database engine
     """
     # Startup: Test database connection
@@ -35,6 +58,10 @@ async def lifespan(app: FastAPI):
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         print("✅ Database connection successful")
+        
+        # Auto-seed prompt templates if empty
+        _seed_prompt_templates()
+        
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         print("   Make sure PostgreSQL is running: docker compose up -d db")

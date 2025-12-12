@@ -1,9 +1,99 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { checkBackendHealth, checkDatabaseHealth } from '../api/client';
+import { getAPIProviders } from '../api/settings';
+
+type StatusType = 'loading' | 'connected' | 'disconnected' | 'configured' | 'not_configured';
+
+interface SystemStatus {
+  backend: StatusType;
+  database: StatusType;
+  llmProvider: StatusType;
+  providerName?: string;
+}
 
 /**
  * Home page - Welcome and quick actions
  */
 export default function Home() {
+  const [status, setStatus] = useState<SystemStatus>({
+    backend: 'loading',
+    database: 'loading',
+    llmProvider: 'loading',
+  });
+
+  // Check system status on mount
+  useEffect(() => {
+    async function checkStatus() {
+      // Check backend health
+      const backendOk = await checkBackendHealth();
+      setStatus((prev) => ({
+        ...prev,
+        backend: backendOk ? 'connected' : 'disconnected',
+      }));
+
+      // Check database health
+      const dbOk = await checkDatabaseHealth();
+      setStatus((prev) => ({
+        ...prev,
+        database: dbOk ? 'connected' : 'disconnected',
+      }));
+
+      // Check LLM provider
+      try {
+        const providers = await getAPIProviders();
+        const activeProvider = providers.find((p) => p.is_active);
+        setStatus((prev) => ({
+          ...prev,
+          llmProvider: activeProvider ? 'configured' : 'not_configured',
+          providerName: activeProvider?.name,
+        }));
+      } catch {
+        setStatus((prev) => ({
+          ...prev,
+          llmProvider: 'not_configured',
+        }));
+      }
+    }
+
+    checkStatus();
+  }, []);
+
+  // Helper to render status badge
+  const renderStatus = (type: StatusType, label?: string) => {
+    switch (type) {
+      case 'loading':
+        return (
+          <span className="text-dark-400 flex items-center gap-2">
+            <span className="w-2 h-2 bg-dark-400 rounded-full animate-pulse"></span>
+            Checking...
+          </span>
+        );
+      case 'connected':
+      case 'configured':
+        return (
+          <span className="text-green-400 flex items-center gap-2">
+            <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+            {label || 'Connected'}
+          </span>
+        );
+      case 'disconnected':
+        return (
+          <span className="text-red-400 flex items-center gap-2">
+            <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+            Disconnected
+          </span>
+        );
+      case 'not_configured':
+        return (
+          <span className="text-yellow-400 flex items-center gap-2">
+            <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
+            Not Configured
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
@@ -57,26 +147,33 @@ export default function Home() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-dark-300">Backend API</span>
-              <span className="text-green-400 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                Connected
-              </span>
+              {renderStatus(status.backend)}
             </div>
             <div className="flex items-center justify-between">
               <span className="text-dark-300">Database</span>
-              <span className="text-green-400 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                Connected
-              </span>
+              {renderStatus(status.database)}
             </div>
             <div className="flex items-center justify-between">
               <span className="text-dark-300">LLM Provider</span>
-              <span className="text-yellow-400 flex items-center gap-2">
-                <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
-                Not Configured
-              </span>
+              {renderStatus(
+                status.llmProvider,
+                status.providerName ? `${status.providerName} (Active)` : undefined
+              )}
             </div>
           </div>
+
+          {/* Quick Setup Hint */}
+          {status.llmProvider === 'not_configured' && (
+            <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
+              <p className="text-yellow-300 text-sm">
+                💡 <strong>Tip:</strong> Go to{' '}
+                <Link to="/settings" className="underline hover:text-yellow-200">
+                  Settings → API Providers
+                </Link>{' '}
+                to configure your LLM provider and start chatting!
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
