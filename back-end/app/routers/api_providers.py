@@ -16,7 +16,7 @@ from app.schemas.api_provider import (
     APIProviderUpdate,
     APIProviderTestResult,
 )
-from app.services.llm_client import LLMClient
+from app.services.llm_client import LLMClient, get_llm_client
 
 router = APIRouter(prefix="/api-providers", tags=["API Providers"])
 
@@ -121,8 +121,8 @@ async def test_api_provider(provider_id: int, db: Session = Depends(get_db)):
             detail=f"API Provider with id {provider_id} not found",
         )
 
-    # Create LLM client and test connection
-    client = LLMClient(provider)
+    # Create appropriate LLM client based on provider type and test connection
+    client = get_llm_client(provider)
     result = await client.test_connection()
 
     return APIProviderTestResult(**result)
@@ -142,8 +142,8 @@ async def test_api_provider_embedding(provider_id: int, db: Session = Depends(ge
             detail=f"API Provider with id {provider_id} not found",
         )
 
-    # Create LLM client and test embedding
-    client = LLMClient(provider)
+    # Create appropriate LLM client based on provider type and test embedding
+    client = get_llm_client(provider)
     result = await client.test_embedding()
 
     return APIProviderTestResult(

@@ -3,14 +3,26 @@ Pydantic schemas for API Provider endpoints.
 """
 
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ProviderTypeEnum(str, Enum):
+    """Supported LLM API provider types."""
+
+    OPENAI = "openai"  # OpenAI-compatible APIs (OpenAI, DeepSeek, Doubao, etc.)
+    HUGGINGFACE = "huggingface"  # HuggingFace Inference API
 
 
 class APIProviderBase(BaseModel):
     """Base schema with common fields."""
 
     name: str = Field(..., min_length=1, max_length=100, description="Provider name")
+    provider_type: ProviderTypeEnum = Field(
+        default=ProviderTypeEnum.OPENAI,
+        description="Provider type: 'openai' for OpenAI-compatible APIs, 'huggingface' for HF Inference API",
+    )
     base_url: str = Field(
         ..., min_length=1, max_length=500, description="API base URL"
     )
@@ -19,7 +31,9 @@ class APIProviderBase(BaseModel):
         ..., min_length=1, max_length=200, description="Chat model ID"
     )
     embedding_model_id: str = Field(
-        ..., min_length=1, max_length=200, description="Embedding model ID"
+        default="",
+        max_length=200,
+        description="Embedding model ID (optional for HuggingFace)",
     )
 
 
@@ -33,10 +47,11 @@ class APIProviderUpdate(BaseModel):
     """Schema for updating an API provider (all fields optional)."""
 
     name: str | None = Field(None, min_length=1, max_length=100)
+    provider_type: ProviderTypeEnum | None = None
     base_url: str | None = Field(None, min_length=1, max_length=500)
     api_key: str | None = Field(None, min_length=1)
     chat_model_id: str | None = Field(None, min_length=1, max_length=200)
-    embedding_model_id: str | None = Field(None, min_length=1, max_length=200)
+    embedding_model_id: str | None = Field(None, max_length=200)
 
 
 class APIProviderRead(BaseModel):
@@ -46,6 +61,7 @@ class APIProviderRead(BaseModel):
 
     id: int
     name: str
+    provider_type: ProviderTypeEnum
     base_url: str
     # Note: api_key is masked for security in responses
     api_key_masked: str = Field(description="Masked API key (e.g., sk-****xxxx)")
@@ -62,6 +78,7 @@ class APIProviderRead(BaseModel):
         return cls(
             id=obj.id,
             name=obj.name,
+            provider_type=ProviderTypeEnum(obj.provider_type),
             base_url=obj.base_url,
             api_key_masked=masked,
             chat_model_id=obj.chat_model_id,

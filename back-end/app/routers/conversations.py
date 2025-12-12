@@ -18,7 +18,7 @@ from app.schemas.conversation import (
     ConversationUpdate,
 )
 from app.schemas.message import ChatRequest, ChatResponse, MessageRead
-from app.services.llm_client import LLMClient, LLMClientError
+from app.services.llm_client import LLMClient, LLMClientError, get_llm_client
 from app.services.prompt_orchestrator import PromptOrchestrator
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
@@ -253,6 +253,7 @@ async def send_message(
     query_embedding = None
     if data.kb_ids:
         try:
+            # Use OpenAI-compatible client for embeddings (HF doesn't support embeddings)
             llm_client = LLMClient(provider)
             embeddings = await llm_client.create_embedding(data.content)
             query_embedding = embeddings[0] if embeddings else None
@@ -266,9 +267,9 @@ async def send_message(
         query_embedding=query_embedding,
     )
 
-    # 3. Call LLM API
+    # 3. Call LLM API (uses factory to get appropriate client for provider type)
     try:
-        llm_client = LLMClient(provider)
+        llm_client = get_llm_client(provider)
         response = await llm_client.create_chat_completion(messages)
         assistant_content = (
             response.get("choices", [{}])[0]

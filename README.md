@@ -398,13 +398,27 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
 
 1. Open RPGChat.AI in browser.
 2. Navigate to **Settings → API Providers**.
-3. Click “Add provider” and create an entry, e.g.:
+3. Click “Add provider” and create an entry, 
+
+#### Option A: OpenAI-Compatible Provider (DeepSeek via SiliconFlow)
 
    - Name: `SiliconFlow DeepSeek`
+   - Provider Type: `openai`
    - Base URL: `https://api.siliconflow.cn/v1`
    - API key: (user’s key; sent via Lion email for TA grading purpose)
    - Chat model id: `deepseek-ai/DeepSeek-V3.2`
    - Embedding model id: `BAAI/bge-m3`
+
+#### Option B: HuggingFace Inference API (Fine-tuned GPT-2 Model)
+
+   - Name: `HuggingFace APAN5560`
+   - Provider Type: `huggingface`
+   - Base URL: `https://api-inference.huggingface.co/models/Jingzong/APAN5560`
+   - API key: (HuggingFace API token, e.g., `hf_xxxxx...`)
+   - Chat model id: `Jingzong/APAN5560`
+   - Embedding model id: (leave empty - HF GPT-2 doesn't support embeddings)
+
+> **Note:** HuggingFace Inference API is ideal for testing fine-tuned models without local GPU. The first request may take longer due to model cold start (~30-60 seconds).
 
 4. Click **Test API** → confirm success.
 5. Mark provider as **Active**.
@@ -462,10 +476,14 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
   - PostgreSQL
   - pgvector extension for vector similarity search
 
-- **LLM Backends (OpenAI-compatible)**
-  - DeepSeek (via SiliconFlow API)
-  - ByteDance / Doubao (if OpenAI-style endpoint)
-  - Custom 8B fine-tuned model hosted on Hugging Face Hub with an OpenAI-compatible gateway
+- **LLM Backends**
+  - **OpenAI-compatible APIs** (provider_type: `openai`)
+    - DeepSeek (via SiliconFlow API)
+    - ByteDance / Doubao
+    - Any OpenAI-style endpoint
+  - **HuggingFace Inference API** (provider_type: `huggingface`)
+    - self Fine-tuned GPT-2 models via cloud (e.g., `Jingzong/APAN5560`)
+    - Automatic format conversion (OpenAI ↔ HuggingFace)
 
 - **Infrastructure**
   - Docker & docker-compose
@@ -478,10 +496,46 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
 ```text
 [Browser (React)]  ←→  [FastAPI backend]  ←→  [PostgreSQL + pgvector]
                                │
-                               └→  [OpenAI-compatible LLM APIs]
-                                      (DeepSeek / Doubao / Custom HF)
+                               ├→  [OpenAI-compatible APIs]
+                               │      (DeepSeek / Doubao / OpenAI)
+                               │
+                               └→  [HuggingFace Inference API]
+                                      (Fine-tuned GPT-2 models)
+                                      ↓
+                                   [Format Wrapper]
+                                   OpenAI ↔ HuggingFace
 ```
 
+### 4.3 LLM Provider Architecture
+
+The backend supports two provider types, selected via the `provider_type` field when creating an API provider:
+
+| Provider Type | Value | Client Used | Use Case |
+|---------------|-------|-------------|----------|
+| **OpenAI-compatible** | `openai` (default) | `LLMClient` | DeepSeek, Doubao, OpenAI, any `/v1/chat/completions` API |
+| **HuggingFace** | `huggingface` | `HFInferenceClient` | HuggingFace Inference API models |
+
+#### How Provider Selection Works
+
+```python
+# Factory function in llm_client.py
+def get_llm_client(provider: APIProvider):
+    if provider.provider_type == "huggingface":
+        return HFInferenceClient(provider)  # Wraps HF API → OpenAI format
+    return LLMClient(provider)  # Direct OpenAI-compatible calls
+```
+
+#### HuggingFace Format Conversion
+
+When using HuggingFace provider:
+
+1. **Request conversion**: OpenAI `messages[]` → HuggingFace `inputs` (prompt string)
+2. **API call**: POST to `https://api-inference.huggingface.co/models/{model_id}`
+3. **Response conversion**: HuggingFace `generated_text` → OpenAI `choices[].message.content`
+
+This allows the frontend and conversation logic to use a unified OpenAI-style interface regardless of the actual backend provider.
+
+---
 
 ## 5. Prompt Orchestration
 
@@ -501,9 +555,12 @@ The backend assembles a multi-layered prompt system for each chat response. This
 | 8 | **Example Dialogues** | "Example interactions:<br>`{{example_dialogues}}`<br><br>Use these as a guide for tone and style." |
 
 
-| # | Template |Suggested Content |
-|---|----------|-----------------|
-| 1 | **Global System** | " You are a world-class actor. Now, portray {{char}} conversing with {{user}}.
+#### Suggested Prompt Template Content
+
+##### 1. Global System
+
+```text
+You are a world-class actor. Now, portray {{char}} conversing with {{user}}.
 Fully immerse yourself in the role of “{{char}},” engaging with the user named “{{user}}” using {{char}}'s personality, tone, and thought processes.
 During the dialogue, you should:
 1. Maintain {{char}}'s defining traits and speech patterns
@@ -511,9 +568,18 @@ During the dialogue, you should:
 3. Address me using terms {{char}} would employ
 4. Express {{char}}'s emotions appropriately
 5. Note that output text will be rendered using Markdown syntax; avoid emojis or emoticons that conflict with Markdown rules.
-" |
-| 2 | **Real-World Time** | "Current date and time: `{{current_time}}`. Use this for temporal awareness in roleplay." |
-| 3 | **Role-Play Meta** | " You are participating in a tavern-style role-play scenario. The user assumes the role of “{{user}},” while you fully embody the character “{{char}}.”  
+```
+
+##### 2. Real-World Time
+
+```text
+Current date and time: {{current_time}}. Use this for temporal awareness in roleplay.
+```
+
+##### 3. Role-Play Meta
+
+```text
+You are participating in a tavern-style role-play scenario. The user assumes the role of “{{user}},” while you fully embody the character “{{char}}.”  
 Your goal is to create an immersive, narrative-driven interaction that feels like a living role-play session.
 
 In this setting:
@@ -528,8 +594,13 @@ During role-play, you must:
 4. Avoid referencing being an AI, language model, system prompt, or any out-of-character concepts  
 5. Reinforce immersion — all descriptions, reactions, and dialogue should remain fully in character and within the role-play context
 
-The objective is to sustain a believable role-play experience at all times. " |
-| 4 | **Dialogue System** | " Follow the dialogue rules below to ensure high-quality, immersive, and consistent interaction.
+The objective is to sustain a believable role-play experience at all times.
+```
+
+##### 4. Dialogue System
+
+```text
+Follow the dialogue rules below to ensure high-quality, immersive, and consistent interaction.
 
 During all responses:
 1. Stay fully in character as {{char}} and never break character under any circumstance  
@@ -543,8 +614,13 @@ During all responses:
 9. When using actions, express them clearly, for example: *She glances toward you quietly*  
 10. Never output content that contradicts {{char}}'s settings, personality, or scenario context
 
-Your responses must always preserve immersion, maintain character realism, and follow narrative coherence.  " |
-| 5 | **Character Config** | " Below are {{char}}'s detailed settings:
+Your responses must always preserve immersion, maintain character realism, and follow narrative coherence.
+```
+
+##### 5. Character Config
+
+```text
+Below are {{char}}'s detailed settings:
 
 {{settings}}
 
@@ -552,22 +628,28 @@ Strictly adhere to these settings when portraying {{char}}. Ensure all responses
 1. Integrate settings into conversation without direct repetition or explicit references
 2. Express and respond in manner consistent with established traits
 3. Demonstrate described characteristics in appropriate contexts
-4. Maintain consistent character portrayal at all times " |
-| 6 | **Character Personality** | "  {{char}}'s personality traits:
+4. Maintain consistent character portrayal at all times
+```
+
+##### 6. Character Personality
+
+```text
+{{char}}'s personality traits:
 
 {{personality}}
 
-Ensure all responses consistently reflect these traits. 
- " |
-| 7 | **Example Dialogues** | " Below are {{char}}'s dialogue examples. Use these to emulate {{char}}'s speaking style and expressions:
+Ensure all responses consistently reflect these traits.
+```
+
+##### 7. Example Dialogues
+
+```text
+Below are {{char}}'s dialogue examples. Use these to emulate {{char}}'s speaking style and expressions:
 
 {{message_example}}
 
 Ensure your responses maintain consistency with the above examples.
- " |
-
-
-
+```
 
 ### 5.2 Variable Placeholders
 

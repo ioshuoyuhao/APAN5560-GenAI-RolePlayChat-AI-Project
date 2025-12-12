@@ -6,14 +6,34 @@ Supports any provider implementing the OpenAI API format:
 - DeepSeek (via SiliconFlow)
 - Doubao
 - Custom HuggingFace models with OpenAI-style gateway
+
+Also provides factory function to get the appropriate client for different provider types.
 """
 
 import time
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
-from app.models.api_provider import APIProvider
+from app.models.api_provider import APIProvider, ProviderType
+
+
+class LLMClientProtocol(Protocol):
+    """Protocol defining the interface for LLM clients."""
+
+    async def create_chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        stream: bool = False,
+    ) -> dict[str, Any]: ...
+
+    async def create_embedding(self, text: str | list[str]) -> list[list[float]]: ...
+
+    async def test_connection(self) -> dict[str, Any]: ...
+
+    async def test_embedding(self) -> dict[str, Any]: ...
 
 
 class LLMClientError(Exception):
@@ -220,4 +240,29 @@ class LLMClient:
                 "latency_ms": round(latency_ms, 2),
                 "embedding_dimension": None,
             }
+
+
+def get_llm_client(provider: APIProvider) -> LLMClientProtocol:
+    """
+    Factory function to get the appropriate LLM client for a provider.
+
+    Args:
+        provider: APIProvider instance with provider_type and credentials
+
+    Returns:
+        LLMClient or HFInferenceClient based on provider_type
+
+    Raises:
+        ValueError: If provider_type is not supported
+    """
+    provider_type = getattr(provider, "provider_type", ProviderType.OPENAI.value)
+
+    if provider_type == ProviderType.HUGGINGFACE.value:
+        # Import here to avoid circular imports
+        from app.services.hf_inference_client import HFInferenceClient
+
+        return HFInferenceClient(provider)
+
+    # Default to OpenAI-compatible client
+    return LLMClient(provider)
 
