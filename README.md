@@ -139,7 +139,8 @@ cd front-end && npm install && npm run dev
 │   │   │   └── prompt_templates.py
 │   │   ├── schemas/           # Pydantic request/response schemas
 │   │   ├── services/          # Business logic
-│   │   │   ├── llm_client.py        # OpenAI-compatible API client
+│   │   │   ├── llm_client.py        # OpenAI-compatible API client + factory
+│   │   │   ├── hf_inference_client.py  # HuggingFace Inference API wrapper
 │   │   │   ├── prompt_orchestrator.py
 │   │   │   └── chunker.py           # Text chunking for RAG
 │   │   └── main.py            # FastAPI app entry point
@@ -350,12 +351,23 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
 
 6. **Global Settings Page**
    - **API Providers tab**
-     - Create / edit OpenAI-compatible providers:
+     - Create / edit providers (supports two types):
        - Name
-       - Base URL (e.g. `https://api.siliconflow.cn/v1`)
-       - API key (sent via lion email)
-       - Chat model id (e.g. `deepseek-ai/DeepSeek-V3.2`)
-       - Embedding model id (e.g. `BAAI/bge-m3`)
+       - Provider Type (`openai` or `huggingface`)
+       - Base URL
+       - API key (sent via Lion email for grading access)
+       - Chat model id
+       - Embedding model id
+     - **Example A: OpenAI-compatible (DeepSeek via SiliconFlow)**
+       - Provider Type: `openai`
+       - Base URL: `https://api.siliconflow.cn/v1`
+       - Chat model id: `deepseek-ai/DeepSeek-V3.2`
+       - Embedding model id: `BAAI/bge-m3`
+     - **Example B: HuggingFace Inference API (Self Fine-tuned GPT-2)**
+       - Provider Type: `huggingface`
+       - Base URL: `https://api-inference.huggingface.co/models/Jingzong/APAN5560`
+       - Chat model id: `Jingzong/APAN5560`
+       - Embedding model id: (leave empty - not supported by ChatGPT-2 base model)
      - Mark one provider as **active** (default).
      - **Test API** function (non-stream test call + latency report).
    - **Knowledge Base tab**
@@ -414,7 +426,7 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
    - Name: `HuggingFace APAN5560`
    - Provider Type: `huggingface`
    - Base URL: `https://api-inference.huggingface.co/models/Jingzong/APAN5560`
-   - API key: (HuggingFace API token, e.g., `hf_xxxxx...`)
+   - API key: (HuggingFace API token, e.g., `hf_xxxxx...` , sent via Lion  email for access)
    - Chat model id: `Jingzong/APAN5560`
    - Embedding model id: (leave empty - HF GPT-2 doesn't support embeddings)
 
@@ -541,7 +553,7 @@ This allows the frontend and conversation logic to use a unified OpenAI-style in
 
 The backend assembles a multi-layered prompt system for each chat response. This ensures consistent roleplay behavior while allowing customization.
 
-### 5.1 The 8 Global Prompt Templates
+### 5.1 The 8 Global Prompt Templates By default
 
 | # | Template | Default Content |
 |---|----------|-----------------|
@@ -555,9 +567,9 @@ The backend assembles a multi-layered prompt system for each chat response. This
 | 8 | **Example Dialogues** | "Example interactions:<br>`{{example_dialogues}}`<br><br>Use these as a guide for tone and style." |
 
 
-#### Suggested Prompt Template Content
+#### Suggested Prompt Template Content by design
 
-##### 1. Global System
+##### 1. Global Systematic prompt
 
 ```text
 You are a world-class actor. Now, portray {{char}} conversing with {{user}}.
@@ -570,13 +582,13 @@ During the dialogue, you should:
 5. Note that output text will be rendered using Markdown syntax; avoid emojis or emoticons that conflict with Markdown rules.
 ```
 
-##### 2. Real-World Time
+##### 2. Real-World Time prompt
 
 ```text
 Current date and time: {{current_time}}. Use this for temporal awareness in roleplay.
 ```
 
-##### 3. Role-Play Meta
+##### 3. Role-Play Meta prompt
 
 ```text
 You are participating in a tavern-style role-play scenario. The user assumes the role of “{{user}},” while you fully embody the character “{{char}}.”  
@@ -597,7 +609,7 @@ During role-play, you must:
 The objective is to sustain a believable role-play experience at all times.
 ```
 
-##### 4. Dialogue System
+##### 4. Dialogue System prompt
 
 ```text
 Follow the dialogue rules below to ensure high-quality, immersive, and consistent interaction.
@@ -617,7 +629,7 @@ During all responses:
 Your responses must always preserve immersion, maintain character realism, and follow narrative coherence.
 ```
 
-##### 5. Character Config
+##### 5. Character Config prompt
 
 ```text
 Below are {{char}}'s detailed settings:
@@ -631,7 +643,7 @@ Strictly adhere to these settings when portraying {{char}}. Ensure all responses
 4. Maintain consistent character portrayal at all times
 ```
 
-##### 6. Character Personality
+##### 6. Character Personality prompt
 
 ```text
 {{char}}'s personality traits:
@@ -641,7 +653,7 @@ Strictly adhere to these settings when portraying {{char}}. Ensure all responses
 Ensure all responses consistently reflect these traits.
 ```
 
-##### 7. Example Dialogues
+##### 7. Example Dialogues prompt
 
 ```text
 Below are {{char}}'s dialogue examples. Use these to emulate {{char}}'s speaking style and expressions:
