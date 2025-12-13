@@ -10,6 +10,12 @@ RPGChat.AI caters to a wide range of user needs—relaxation, inspiration, or ro
 
 ```bash
 git clone git@github.com:ioshuoyuhao/APAN5560-GenAI-RolePlayChat-AI-Project.git
+```
+Alternatively, the command below also helps clone repository. 
+```bash
+git clone https://github.com/ioshuoyuhao/APAN5560-GenAI-RolePlayChat-AI-Project.git
+```
+```bash
 cd APAN5560-GenAI-RolePlayChat-AI-Project
 cp .env.example .env    # Create env file (edit API keys as needed)
 ./start.sh              # Launch in development mode
