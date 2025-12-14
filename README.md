@@ -16,7 +16,7 @@ git clone https://github.com/ioshuoyuhao/APAN5560-GenAI-RolePlayChat-AI-Project.
 ```bash
 cd APAN5560-GenAI-RolePlayChat-AI-Project
 cp .env.example .env    # Create env file (edit API keys as needed)
-./start.sh              # Launch in development mode, install npm (https://nodejs.org/en/download) before running
+./start.sh  # Launch in development mode, please install npm (https://nodejs.org/en/download) before running this command
 ```
 
 ### Option 2: Full Docker Deployment
