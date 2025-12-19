@@ -359,23 +359,25 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
    - **API Providers tab**
      - Create / edit providers (supports two types):
        - Name
-       - Provider Type (`openai` or `huggingface`)
+       - Provider Type (`openai` or `huggingface`) — auto-fills default values
        - Base URL
        - API key (sent via Lion email for grading access)
        - Chat model id
-       - Embedding model id
+       - Embedding model id *(optional — only required for Knowledge Base RAG)*
      - **Example A: OpenAI-compatible (DeepSeek via SiliconFlow)**
        - Provider Type: `openai`
        - Base URL: `https://api.siliconflow.cn/v1`
-       - Chat model id: `deepseek-ai/DeepSeek-V3.2`
+       - Chat model id: `deepseek-ai/DeepSeek-V3`
        - Embedding model id: `BAAI/bge-m3`
-     - **Example B: HuggingFace Inference API (Self Fine-tuned GPT-2)**
+     - **Example B: HuggingFace Inference Endpoint (Self Fine-tuned GPT-2)**
        - Provider Type: `huggingface`
-       - Base URL: `https://api-inference.huggingface.co/models/Jingzong/APAN5560`
+       - Base URL: `https://ot1bh06tglp35kdk.us-east-1.aws.endpoints.huggingface.cloud`
        - Chat model id: `Jingzong/APAN5560`
-       - Embedding model id: (leave empty - not supported by ChatGPT-2 base model)
+       - Embedding model id: (leave empty — HF fine-tuned models don't support embeddings)
+       - ⚠️ **Note:** We use paid HuggingFace Inference Endpoint for deployment
      - Mark one provider as **active** (default).
      - **Test API** function (non-stream test call + latency report).
+     - ⚠️ **Note:** To use Knowledge Base RAG, you must configure an Embedding Model ID. Self fine-tuned models (HuggingFace GPT-2) do not support embeddings; use a 3rd party API (e.g., SiliconFlow, OpenAI) for RAG functionality.
    - **Knowledge Base tab**
      - Create KBs.
      - Upload documents (markdown / txt ).
@@ -499,8 +501,8 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
     - DeepSeek (via SiliconFlow API)
     - ByteDance / Doubao
     - Any OpenAI-style endpoint
-  - **HuggingFace Inference API** (provider_type: `huggingface`)
-    - self Fine-tuned GPT-2 models via cloud (e.g., `Jingzong/APAN5560`)
+  - **HuggingFace Inference Endpoints** (provider_type: `huggingface`)
+    - Self fine-tuned GPT-2 models via paid Inference Endpoint (e.g., `Jingzong/APAN5560`)
     - Automatic format conversion (OpenAI ↔ HuggingFace)
 
 - **Infrastructure**
@@ -531,7 +533,7 @@ The backend supports two provider types, selected via the `provider_type` field 
 | Provider Type | Value | Client Used | Use Case |
 |---------------|-------|-------------|----------|
 | **OpenAI-compatible** | `openai` (default) | `LLMClient` | DeepSeek, Doubao, OpenAI, any `/v1/chat/completions` API |
-| **HuggingFace** | `huggingface` | `HFInferenceClient` | HuggingFace Inference API models |
+| **HuggingFace** | `huggingface` | `HFInferenceClient` | HuggingFace Inference Endpoints (paid, dedicated deployment) |
 
 #### How Provider Selection Works
 
@@ -547,11 +549,13 @@ def get_llm_client(provider: APIProvider):
 
 When using HuggingFace provider:
 
-1. **Request conversion**: OpenAI `messages[]` → HuggingFace `inputs` (prompt string)
-2. **API call**: POST to `https://api-inference.huggingface.co/models/{model_id}`
+1. **Request conversion**: OpenAI `messages[]` → HuggingFace `inputs` (prompt string with `User:` / `Assistant:` format)
+2. **API call**: POST to your Inference Endpoint URL (e.g., `https://xxx.aws.endpoints.huggingface.cloud`)
 3. **Response conversion**: HuggingFace `generated_text` → OpenAI `choices[].message.content`
 
 This allows the frontend and conversation logic to use a unified OpenAI-style interface regardless of the actual backend provider.
+
+> ⚠️ **Note:** The free HuggingFace Inference API (`api-inference.huggingface.co`) is deprecated for custom models. We tried an alternative approach that deploys a paid Inference Endpoint (~$0.07/hour for CPU) for custom fine-tuned models like `Jingzong/APAN5560`.
 
 ---
 

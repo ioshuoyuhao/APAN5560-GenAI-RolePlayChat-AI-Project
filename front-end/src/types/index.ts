@@ -104,9 +104,12 @@ export interface ChatResponse {
 // API Provider Types
 // ============================================
 
+export type ProviderType = 'openai' | 'huggingface';
+
 export interface APIProvider {
   id: number;
   name: string;
+  provider_type: ProviderType;
   base_url: string;
   api_key_masked: string;
   chat_model_id: string;
@@ -118,14 +121,16 @@ export interface APIProvider {
 
 export interface APIProviderCreate {
   name: string;
+  provider_type?: ProviderType;
   base_url: string;
   api_key: string;
   chat_model_id: string;
-  embedding_model_id: string;
+  embedding_model_id?: string;
 }
 
 export interface APIProviderUpdate {
   name?: string;
+  provider_type?: ProviderType;
   base_url?: string;
   api_key?: string;
   chat_model_id?: string;

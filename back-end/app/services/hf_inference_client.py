@@ -32,9 +32,6 @@ class HFInferenceClient:
         ])
     """
 
-    # HuggingFace Inference API base URL
-    HF_INFERENCE_BASE = "https://api-inference.huggingface.co/models"
-
     def __init__(self, provider, timeout: float = 120.0):
         """
         Initialize the HuggingFace Inference client.
@@ -49,11 +46,11 @@ class HFInferenceClient:
         self.timeout = timeout
 
         # Build endpoint URL
-        # If base_url is provided and looks like HF, use it; otherwise construct
-        if provider.base_url and "huggingface.co" in provider.base_url:
-            self.endpoint = provider.base_url.rstrip("/")
-        else:
-            self.endpoint = f"{self.HF_INFERENCE_BASE}/{self.model_id}"
+        # For HuggingFace provider, always use the provided base_url directly
+        # Supports both:
+        # - Inference Endpoints: https://xxx.us-east-1.aws.endpoints.huggingface.cloud
+        # - Legacy API (deprecated): https://api-inference.huggingface.co/models/xxx
+        self.endpoint = provider.base_url.rstrip("/")
 
     def _get_headers(self) -> dict[str, str]:
         """Get headers for HuggingFace API requests."""
@@ -62,52 +59,44 @@ class HFInferenceClient:
             "Content-Type": "application/json",
         }
 
+    # GPT-2 has 1024 max position embeddings, leave room for generation
+    MAX_PROMPT_CHARS = 800
+
     def _messages_to_prompt(self, messages: list[dict[str, str]]) -> str:
         """
         Convert OpenAI-style messages array to a single prompt string.
 
-        For GPT-2 style models, we format as:
-        User: {user_message}
-        Assistant: {assistant_message}
-        ...
-        User: {last_user_message}
-        Assistant:
+        For GPT-2 style models with custom handler.py, we send ONLY the
+        last user message content (not formatted with User:/Assistant:).
+        The handler.py on HuggingFace adds the User:/Assistant: formatting.
+
+        This avoids double-formatting and keeps prompts short for GPT-2's
+        1024 token limit.
         """
-        prompt_parts = []
+        # Extract the last user message only (ignore system/assistant for HF)
+        last_user_content = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                last_user_content = msg.get("content", "")
+                break
 
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
+        # Truncate to avoid exceeding GPT-2's position embedding limit
+        if len(last_user_content) > self.MAX_PROMPT_CHARS:
+            last_user_content = last_user_content[:self.MAX_PROMPT_CHARS] + "..."
 
-            if role == "system":
-                # Prepend system message as context
-                prompt_parts.append(f"{content}\n")
-            elif role == "user":
-                prompt_parts.append(f"User: {content}")
-            elif role == "assistant":
-                prompt_parts.append(f"Assistant: {content}")
-
-        # Add the assistant prompt for completion
-        prompt_parts.append("Assistant:")
-
-        return "\n".join(prompt_parts)
+        return last_user_content
 
     def _extract_assistant_response(self, generated_text: str, prompt: str) -> str:
         """
         Extract the assistant's response from the generated text.
 
-        The model returns the full text including the prompt, so we need
-        to extract only the new content after "Assistant:".
+        With custom handler.py on HuggingFace Inference Endpoint, the response
+        is already cleaned and extracted. We just need minimal post-processing.
         """
-        # Remove the original prompt from the beginning
-        if generated_text.startswith(prompt):
-            response = generated_text[len(prompt):].strip()
-        else:
-            # Try to find the last "Assistant:" and get text after it
-            parts = generated_text.rsplit("Assistant:", 1)
-            response = parts[-1].strip() if len(parts) > 1 else generated_text.strip()
+        # The handler.py already extracts and cleans the response
+        response = generated_text.strip()
 
-        # Clean up the response
+        # Additional cleanup if needed
         response = self._clean_response(response)
         return response
 
@@ -164,19 +153,18 @@ class HFInferenceClient:
         # Convert messages to prompt
         prompt = self._messages_to_prompt(messages)
 
-        # Build HuggingFace request payload
+        # Build HuggingFace Inference Endpoint payload
+        # The custom handler.py on HuggingFace will:
+        # 1. Wrap input with "User: {input}\nAssistant:" format
+        # 2. Generate response with appropriate parameters
+        # 3. Clean and extract the assistant's response
         payload: dict[str, Any] = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": max_tokens or 100,
+                "max_new_tokens": max_tokens or 40,  # GPT-2 works better with shorter outputs
                 "temperature": temperature,
-                "do_sample": True,
                 "top_p": 0.9,
                 "repetition_penalty": 1.1,
-                "return_full_text": True,
-            },
-            "options": {
-                "wait_for_model": True,  # Wait if model is loading
             },
         }
 

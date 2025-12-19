@@ -21,6 +21,7 @@ import type {
   APIProviderCreate,
   KnowledgeBase,
   PromptTemplate,
+  ProviderType,
 } from '../types';
 
 /**
@@ -88,6 +89,7 @@ function APIProvidersTab() {
 
   const [formData, setFormData] = useState<APIProviderCreate>({
     name: '',
+    provider_type: 'openai',
     base_url: 'https://api.siliconflow.cn/v1',
     api_key: '',
     chat_model_id: 'deepseek-ai/DeepSeek-V3',
@@ -169,6 +171,7 @@ function APIProvidersTab() {
     setEditingId(null);
     setFormData({
       name: '',
+      provider_type: 'openai',
       base_url: 'https://api.siliconflow.cn/v1',
       api_key: '',
       chat_model_id: 'deepseek-ai/DeepSeek-V3',
@@ -180,6 +183,7 @@ function APIProvidersTab() {
     setEditingId(provider.id);
     setFormData({
       name: provider.name,
+      provider_type: provider.provider_type || 'openai',
       base_url: provider.base_url,
       api_key: '', // Don't populate for security
       chat_model_id: provider.chat_model_id,
@@ -213,6 +217,37 @@ function APIProvidersTab() {
               />
             </div>
             <div>
+              <label className="block text-sm text-dark-300 mb-1">Provider Type</label>
+              <select
+                value={formData.provider_type || 'openai'}
+                onChange={(e) => {
+                  const newType = e.target.value as ProviderType;
+                  // Auto-fill defaults based on provider type
+                  if (newType === 'huggingface') {
+                    setFormData({
+                      ...formData,
+                      provider_type: newType,
+                      base_url: 'https://ot1bh06tglp35kdk.us-east-1.aws.endpoints.huggingface.cloud',
+                      chat_model_id: 'Jingzong/APAN5560',
+                      embedding_model_id: '',
+                    });
+                  } else {
+                    setFormData({
+                      ...formData,
+                      provider_type: newType,
+                      base_url: 'https://api.siliconflow.cn/v1',
+                      chat_model_id: 'deepseek-ai/DeepSeek-V3',
+                      embedding_model_id: 'BAAI/bge-m3',
+                    });
+                  }
+                }}
+                className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-white"
+              >
+                <option value="openai">OpenAI-compatible</option>
+                <option value="huggingface">HuggingFace Inference</option>
+              </select>
+            </div>
+            <div className="col-span-2">
               <label className="block text-sm text-dark-300 mb-1">Base URL</label>
               <input
                 type="url"
@@ -231,7 +266,7 @@ function APIProvidersTab() {
                 required={!editingId}
                 value={formData.api_key}
                 onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                placeholder="sk-..."
+                placeholder={formData.provider_type === 'huggingface' ? 'hf_...' : 'sk-...'}
                 className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-white"
               />
             </div>
@@ -246,14 +281,19 @@ function APIProvidersTab() {
               />
             </div>
             <div>
-              <label className="block text-sm text-dark-300 mb-1">Embedding Model ID</label>
+              <label className="block text-sm text-dark-300 mb-1">
+                Embedding Model ID <span className="text-dark-500">(optional)</span>
+              </label>
               <input
                 type="text"
-                required
-                value={formData.embedding_model_id}
+                value={formData.embedding_model_id || ''}
                 onChange={(e) => setFormData({ ...formData, embedding_model_id: e.target.value })}
+                placeholder="Leave empty if not using RAG"
                 className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-white"
               />
+              <p className="text-xs text-dark-500 mt-1">
+                Required for Knowledge Base RAG. Self fine-tuned models don't support embeddings.
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -292,10 +332,17 @@ function APIProvidersTab() {
                     {provider.is_active && (
                       <span className="px-2 py-0.5 bg-primary-600 rounded text-xs">Active</span>
                     )}
+                    <span className={`px-2 py-0.5 rounded text-xs ${
+                      provider.provider_type === 'huggingface' 
+                        ? 'bg-yellow-600/30 text-yellow-400' 
+                        : 'bg-green-600/30 text-green-400'
+                    }`}>
+                      {provider.provider_type === 'huggingface' ? 'HuggingFace' : 'OpenAI'}
+                    </span>
                   </div>
                   <p className="text-sm text-dark-400 mt-1">{provider.base_url}</p>
                   <p className="text-xs text-dark-500 mt-0.5">
-                    Chat: {provider.chat_model_id} | Embedding: {provider.embedding_model_id}
+                    Chat: {provider.chat_model_id} | Embedding: {provider.embedding_model_id || '(not set)'}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -437,6 +484,15 @@ function KnowledgeBaseTab() {
           </button>
         </form>
       )}
+
+      {/* Embedding Model Reminder */}
+      <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
+        <p className="text-sm text-yellow-400">
+          ⚠️ <strong>Important:</strong> To use Knowledge Base RAG, ensure your active API provider has an 
+          <strong> Embedding Model ID</strong> configured. Self fine-tuned models (e.g., HuggingFace GPT-2) 
+          do not support embeddings — use a 3rd party API like SiliconFlow or OpenAI instead.
+        </p>
+      </div>
 
       {/* KB List */}
       {loading ? (

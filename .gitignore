@@ -193,6 +193,10 @@ cython_debug/
 .ruff_cache/
 .specstory/
 
+# Secrets / Tokens (never commit)
+Token.env
+**/Token.env
+
 # PyPI configuration file
 .pypirc
 
