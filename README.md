@@ -433,7 +433,7 @@ It focuses on **tavern-style character role-play, OpenAI-compatible LLM APIs, an
 
    - Name: `HuggingFace APAN5560`
    - Provider Type: `huggingface`
-   - Base URL: `https://api-inference.huggingface.co/models/Jingzong/APAN5560`
+   - Base URL: `https://ot1bh06tglp35kdk.us-east-1.aws.endpoints.huggingface.cloud`  
    - API key: (HuggingFace API token, e.g., `hf_xxxxx...` , sent via Lion  email for access)
    - Chat model id: `Jingzong/APAN5560`
    - Embedding model id: (leave empty - HF GPT-2 doesn't support embeddings)
